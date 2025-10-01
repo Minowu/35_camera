@@ -98,7 +98,7 @@ class YOLOInference:
             detections.append({
                 "class_id": class_id,
                 "class_name": class_name,
-                "confidence": float(confidence),
+"confidence": float(confidence),
                 "bbox": {
                     "x1": float(x1),
                     "y1": float(y1),
@@ -171,13 +171,16 @@ def ai_inference_worker(shared_dict, result_dict, cam_names=None, model_path="we
                         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                         
                         if frame is not None:
+                            # Resize frame về 1280x720
+                            frame = cv2.resize(frame, (1280, 720))
+                            
                             # Chạy inference
                             start_time = time.time()
                             results = yolo.detect(frame)
                             inference_time = time.time() - start_time
                             
                             if results is not None:
-                                # Lấy thông tin detection theo format JSON
+# Lấy thông tin detection theo format JSON
                                 frame_shape = frame.shape
                                 detection_info = yolo.get_detection_info(results, frame_shape)
                                 
@@ -231,7 +234,7 @@ def ai_inference_worker(shared_dict, result_dict, cam_names=None, model_path="we
                 
                 else:
                     # Camera không có tín hiệu
-                    if cam_name in result_dict:
+if cam_name in result_dict:
                         result_dict[cam_name]['status'] = 'no_signal'
             
             frame_count += 1
