@@ -75,13 +75,13 @@ class CameraOrchestrator:
                 self.processes.append(ai_process)
                 ai_process.start()
             
-            # AI display worker (hiển thị kết quả có AI)
-            ai_display_process = Process(
-                target=ai_display_worker,
-                args=(self.result_dict,)
-            )
-            self.processes.append(ai_display_process)
-            ai_display_process.start()
+            # AI display worker tạm thời tắt - chỉ in JSON ra console
+            # ai_display_process = Process(
+            #     target=ai_display_worker,
+            #     args=(self.result_dict,)
+            # )
+            # self.processes.append(ai_display_process)
+            # ai_display_process.start()
             
         else:
             # Display worker thường (hiển thị frame gốc)

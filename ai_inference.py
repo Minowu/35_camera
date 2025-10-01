@@ -3,6 +3,7 @@ import numpy as np
 import time
 from ultralytics import YOLO
 import json
+from datetime import datetime
 
 class YOLOInference:
     """Class xử lý inference YOLO"""
@@ -66,35 +67,53 @@ class YOLOInference:
         
         return frame
     
-    def get_detection_info(self, results):
+    def get_detection_info(self, results, frame_shape):
         """
-        Lấy thông tin detection để in ra
+        Lấy thông tin detection theo định dạng JSON yêu cầu
         
         Args:
             results: YOLO results
+            frame_shape: Tuple (height, width, channels)
             
         Returns:
-            dict: Thông tin detection
+            dict: Thông tin detection theo format JSON
         """
         if results is None or len(results.boxes) == 0:
-            return {"detections": 0, "objects": []}
+            return {
+                "detections": [],
+                "detection_count": 0
+            }
         
-        objects = []
+        detections = []
         for box in results.boxes:
             confidence = box.conf[0].cpu().numpy()
             class_id = int(box.cls[0].cpu().numpy())
             class_name = results.names[class_id]
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
             
-            objects.append({
-                "class": class_name,
+            # Tính center point
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+            
+            detections.append({
+                "class_id": class_id,
+                "class_name": class_name,
                 "confidence": float(confidence),
-                "bbox": [float(x1), float(y1), float(x2), float(y2)]
+                "bbox": {
+                    "x1": float(x1),
+                    "y1": float(y1),
+                    "x2": float(x2),
+                    "y2": float(y2)
+                },
+                "center": {
+                    "x": float(center_x),
+                    "y": float(center_y)
+                }
             })
         
         return {
-            "detections": len(objects),
-            "objects": objects
+            "detections": detections,
+            "detection_count": len(detections)
         }
 
 def ai_inference_worker(shared_dict, result_dict, cam_names=None, model_path="weights/model_vl_0205.pt"):
@@ -158,35 +177,36 @@ def ai_inference_worker(shared_dict, result_dict, cam_names=None, model_path="we
                             inference_time = time.time() - start_time
                             
                             if results is not None:
-                                # Vẽ kết quả lên frame
-                                frame_with_results = yolo.draw_results(frame.copy(), results)
+                                # Lấy thông tin detection theo format JSON
+                                frame_shape = frame.shape
+                                detection_info = yolo.get_detection_info(results, frame_shape)
                                 
-                                # Encode frame có kết quả
-                                _, buffer = cv2.imencode('.jpg', frame_with_results, 
-                                                        [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                result_jpeg = buffer.tobytes()
+                                # Tạo kết quả JSON theo format yêu cầu
+                                json_result = {
+                                    "camera_id": cam_name,
+                                    "frame_id": frame_count,
+                                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                                    "frame_shape": {
+                                        "height": int(frame_shape[0]),
+                                        "width": int(frame_shape[1]),
+                                        "channels": int(frame_shape[2])
+                                    },
+                                    "detections": detection_info["detections"],
+                                    "detection_count": detection_info["detection_count"]
+                                }
                                 
-                                # Lấy thông tin detection
-                                detection_info = yolo.get_detection_info(results)
+                                # In kết quả JSON ra console
+                                print(json.dumps(json_result, indent=2))
                                 
-                                # Lưu vào result_dict
+                                # Lưu vào result_dict (để tương thích với code cũ)
                                 result_dict[cam_name] = {
-                                    'frame': result_jpeg,
+                                    'frame': None,  # Không cần frame nữa
                                     'ts': current_time,
                                     'status': 'ok',
                                     'inference_time': inference_time,
-                                    'detections': detection_info['detections'],
-                                    'objects': detection_info['objects']
+                                    'detections': detection_info['detection_count'],
+                                    'objects': detection_info['detections']
                                 }
-                                
-                                # # In thông tin detection
-                                # if detection_info['detections'] > 0:
-                                #     print(f"\n=== {cam_name} - Frame {frame_count} ===")
-                                #     print(f"Inference time: {inference_time:.3f}s")
-                                #     print(f"Detections: {detection_info['detections']}")
-                                #     for obj in detection_info['objects']:
-                                #         print(f"  - {obj['class']}: {obj['confidence']:.2f}")
-                                print(len(result_dict), "cameras processed with AI")
                             else:
                                 # Inference lỗi
                                 result_dict[cam_name] = {
