@@ -113,12 +113,15 @@ class CameraThread(threading.Thread):
                         print(f"🔄 Camera {self.cam_name} đã kết nối lại thành công")
                         continue
                 
-                # Resize frame
-                frame = cv2.resize(frame, (640, 360))
+               # Thêm frame skipping
+                frame_count = 0
+                if frame_count % 2 == 0:  # Chỉ encode 1/2 frame
+                    _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    jpeg_bytes = buffer.tobytes()
+                else:
+                    jpeg_bytes = None  # Skip frame này
                 
-                # Encode JPEG để giảm dung lượng
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                jpeg_bytes = buffer.tobytes()
+                frame_count += 1
                 
                 # Lưu vào local_dict
                 self.local_dict[self.cam_name] = {
