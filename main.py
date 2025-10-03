@@ -65,23 +65,33 @@ class CameraOrchestrator:
             process.start()
         
         if self.use_ai:
-            print("Khởi động AI inference processes...")
-            for i, camera_group in enumerate(camera_groups):
-                ai_cam_names = [cam[0] for cam in camera_group]
-                ai_process = Process(
-                    target=ai_inference_worker,
-                    args=(self.shared_dict, self.result_dict, ai_cam_names, self.model_path)
-                )
-                self.processes.append(ai_process)
-                ai_process.start()
+            print("Khởi động AI inference process (batch processing)...")
+
+            ## Sử dụng 5 process để xử lý tất cả camera
+            # for i, camera_group in enumerate(camera_groups):
+            #     ai_cam_names = [cam[0] for cam in camera_group]
+            #     ai_process = Process(
+            #         target=ai_inference_worker,
+            #         args=(self.shared_dict, self.result_dict, ai_cam_names, self.model_path)
+            #     )
+            #     self.processes.append(ai_process)
+            #     ai_process.start()
+
+            # Chỉ tạo 1 AI inference process duy nhất xử lý tất cả camera
+            ai_process = Process(
+                target=ai_inference_worker,
+                args=(self.shared_dict, self.result_dict, self.model_path)  # None = process tất cả camera
+            )
+            self.processes.append(ai_process)
+            ai_process.start()
             
-            # AI display worker tạm thời tắt - chỉ in JSON ra console
-            # ai_display_process = Process(
-            #     target=ai_display_worker,
-            #     args=(self.result_dict,)
-            # )
-            # self.processes.append(ai_display_process)
-            # ai_display_process.start()
+            # AI display worker (hiển thị kết quả có AI)
+            ai_display_process = Process(
+                target=ai_display_worker,
+                args=(self.result_dict,)
+            )
+            self.processes.append(ai_display_process)
+            ai_display_process.start()
             
         else:
             # Display worker thường (hiển thị frame gốc)
@@ -99,8 +109,7 @@ class CameraOrchestrator:
         try:
             print("Hệ thống đang chạy. Nhấn Ctrl+C để dừng...")
             while True:
-                time.sleep(1)
-                
+                time.sleep(5)
                 # Hiển thị thống kê (optional)
                 active_cameras = len(self.shared_dict)
                 print(f"Camera hoạt động: {active_cameras}", end='\r')
@@ -163,7 +172,7 @@ def main():
     NUM_PROCESSES = 5  # Có thể thay đổi số này
     MAX_RETRY_ATTEMPTS = 5  # Số lần thử kết nối lại tối đa
     USE_AI = True  # Bật/tắt AI detection
-    MODEL_PATH = "weights/model_vl_0205.pt"  # Đường dẫn model YOLO
+    MODEL_PATH = "weights/model-hanam_0506.pt"  # Đường dẫn model YOLO
     
     orchestrator = CameraOrchestrator(camera_urls, NUM_PROCESSES, MAX_RETRY_ATTEMPTS, USE_AI, MODEL_PATH)
     
